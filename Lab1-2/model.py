@@ -1,12 +1,14 @@
 from modules import String
+import os.path
 
 class PictureFile:
 
-	def __init__(self, path):
+	def __init__(self, path=""):
 
 		self.width = 0
 		self.height = 0
-		self.frames = 1
+		self.frames = 0
+		self.frame = 0
 
 		self.caret = 0
 		self.firstframe = 0
@@ -15,10 +17,32 @@ class PictureFile:
 		self.opened = False
 
 
+	def get_size(self):
+		return self.width, self.height
+
+
+	def set_file_path(self, path=""):
+
+		self.close()
+		self.filepath = path
+
+		self.width = 0
+		self.height = 0
+		self.frames = 0
+		self.frame = 0
+		
+		self.caret = 0
+		self.firstframe = 0
+		self.file = None
+		self.opened = False
+
+
 	def open(self):
 
-		self.file = open(self.filepath)
-		self.opened = True
+		if os.path.isfile(self.filepath):
+			self.file = open(self.filepath)
+			self.opened = True
+
 
 	def read_meta(self):
 
@@ -90,6 +114,7 @@ class PictureFile:
 		if len(pixeldata) == 0:
 			self.caret = self.firstframe
 			pixeldata, nlinecnt = self.__get_pixel_data()
+			self.frame = 1
 		
 		self.caret += len(pixeldata)+nlinecnt+3
 
@@ -98,26 +123,28 @@ class PictureFile:
 
 	def read_next_frame(self):
 		#Function to read frame - all pixels data
-
-		if not self.opened or self.width*self.height == 0:
-			return None
-
+		
+		self.frame += 1
 		pix = []
 		for i in range(self.width*self.height):
 			pix.append(self.__read_pixel())
 
 		return pix
 
+
 	def iter_next_frame(self):
 		#Function to read frame - iterable data
-
-		if not self.opened or self.width*self.height == 0:
-			return None
 
 		for i in range(self.width*self.height):
 			yield self.__read_pixel()
 
 
 	def close(self):
+
+		if not self.opened:
+			return None
+
+		self.opened = False
 		return self.file.close()
+
 

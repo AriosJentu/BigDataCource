@@ -50,6 +50,7 @@ class String:
 
 		return [int(i) for i in s]
 
+
 	def rcut(self, tosize):
 		#Function to cut string to new size from right (remove all right part after fixed size)
 		self.string = self.string[:tosize]
@@ -61,6 +62,7 @@ class String:
 			end = len(self.string)
 
 		return self.string.find(strs, beg, end)
+
 
 	def count(self, strs):
 		return self.string.count(strs)

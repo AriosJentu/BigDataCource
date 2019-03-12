@@ -11,6 +11,7 @@ class PictureFile:
 		self.frame = 0
 
 		self.caret = 0
+		self.currentcaret = 0
 		self.firstframe = 0
 		self.filepath = path
 		self.file = None
@@ -32,9 +33,13 @@ class PictureFile:
 		self.frame = 0
 		
 		self.caret = 0
+		self.currentcaret = 0
 		self.firstframe = 0
 		self.file = None
 		self.opened = False
+
+	def clear(self):
+		return self.set_file_path("")
 
 
 	def open(self):
@@ -55,6 +60,7 @@ class PictureFile:
 		if self.file.read(1) != "{":
 			
 			self.firstframe = 2
+			self.currentcaret = self.firstframe
 			self.caret = self.firstframe
 			
 			self.width = 3
@@ -82,6 +88,7 @@ class PictureFile:
 				self.width, self.height, self.frames = submeta.readints()
 
 				self.firstframe = len(submeta)+1
+				self.currentcaret = self.firstframe
 				self.caret = self.firstframe
 
 				self.file.seek(self.firstframe, 0)
@@ -121,22 +128,36 @@ class PictureFile:
 		return pixeldata.readints()
 
 
-	def read_next_frame(self):
+	def read_next_frame(self, next_indx=1):
 		#Function to read frame - all pixels data
 		
-		self.frame += 1
+		self.frame += 1*next_indx
+		self.currentcaret = self.caret
 		pix = []
 		for i in range(self.width*self.height):
 			pix.append(self.__read_pixel())
 
 		return pix
 
+	def read_current_frame(self):
+		#Function to read frame - all pixels data
+		self.caret = self.currentcaret
+		return self.read_next_frame(0)
 
-	def iter_next_frame(self):
+
+	def iter_next_frame(self, next_indx=1):
 		#Function to read frame - iterable data
 
+		self.frame += 1*next_indx
+		self.currentcaret = self.caret
 		for i in range(self.width*self.height):
 			yield self.__read_pixel()
+
+
+	def iter_current_frame(self):
+		#Function to read current frame - iterable data
+		self.caret = self.currentcaret
+		return self.iter_next_frame(0)
 
 
 	def close(self):

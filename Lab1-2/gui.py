@@ -6,7 +6,9 @@ class AppFrame(wx.Frame):
 
 	TOP_PADD = 46
 	PLAY_ID = 2
-	OPEN_ID = 3
+	CLEAR_ID = 3
+	OPEN_ID = 4
+	SPIN_ID = 5
 
 	def __init__(self, parent, fid, position, size):
 
@@ -14,8 +16,6 @@ class AppFrame(wx.Frame):
 		wx.Frame.__init__(self, parent, fid, "Visualizer", 
 			wx.Point(position), wx.Size(size)
 		)
-
-		self.SetMinSize(wx.Size(100, 100))
 
 		#Graphical elements - buttons and info
 		self.PlayButton = wx.Button(self, AppFrame.PLAY_ID, "Play", 
@@ -27,6 +27,16 @@ class AppFrame(wx.Frame):
 			wx.Point(2, 2), wx.Size(60, AppFrame.TOP_PADD-4)
 		)
 
+		self.ClearButton = wx.Button(self, AppFrame.CLEAR_ID, "Clear",
+			wx.Point(self.GetSize().Width-2*(2+60), 2), 
+			wx.Size(60, AppFrame.TOP_PADD-4)
+		)
+
+		self.Spin = wx.SpinCtrl(self, AppFrame.SPIN_ID, "0",
+			wx.Point(self.GetSize().Width - 4*(2+60), 2),
+			wx.Size(120, AppFrame.TOP_PADD-4)
+		)
+
 		self.Info = wx.StaticText(self, -1, "Size: \nFrame: ; Frames:", 
 			wx.Point(64, 2), wx.DefaultSize
 		)
@@ -35,6 +45,10 @@ class AppFrame(wx.Frame):
 			"JSON Picture File (*.json)|*.json", wx.FD_OPEN
 		)
 
+		#GUI Properties
+		self.SetMinSize(wx.Size(500, 400))
+		self.Spin.SetRange(0, 100)
+
 		#Properties
 		self.PictureFile = model.PictureFile()
 		self.Animated = False
@@ -42,47 +56,62 @@ class AppFrame(wx.Frame):
 
 		self.PictureSize = wx.Size(self.PictureFile.get_size())
 		self.PixelSize = wx.Size(1, 1)
+		self.PlaneSize = wx.Size(0, 0)
 
-		self.Pixels = [] #[[r, g, b], [r, g, b]]
+		self.Pixels = None #Iterator
+		self._BUFFER = wx.Bitmap(100, 100)
 
 		#Events
 		self.Bind(wx.EVT_SIZE, self.OnSize)
 		self.Bind(wx.EVT_PAINT, self.OnPaint)
 		self.Bind(wx.EVT_BUTTON, self.OnClickPlay, self.PlayButton)
 		self.Bind(wx.EVT_BUTTON, self.OnClickOpen, self.OpenButton)
+		self.Bind(wx.EVT_BUTTON, self.OnClickClear, self.ClearButton)
+		self.Bind(wx.EVT_SPINCTRL, self.OnScrollSpin, self.Spin)
 
 		self.RecalculatePixelSize()
+		self.UpdateDraw()
 
 
 	def OnSize(self, event):
+
 		self.PlayButton.SetPosition(wx.Point(self.GetSize().Width-2-60, 2))
-		self.RecalculatePixelSize()
-
-
-	def OnPaint(self, event):
+		self.ClearButton.SetPosition(wx.Point(self.GetSize().Width-2*(2+60), 2))
+		self.Spin.SetPosition(wx.Point(self.GetSize().Width-4*(2+60), 2))
 
 		self.RecalculatePixelSize()
-		self.PaintZone = wx.PaintDC(self)
 
-		self.PaintZone.SetBackground(self.Brush)
-		self.PaintZone.Clear()
+		self._BUFFER = wx.Bitmap(self.PlaneSize)
+		self.UpdateDraw()
 
-		self.Draw()
+
+	def OnPaint(self, event=None):
+
+		PaintZone = wx.PaintDC(self)
+		PaintZone.DrawBitmap(self._BUFFER, 0, AppFrame.TOP_PADD)
 
 
 	def RecalculatePixelSize(self):
 
 		ClientSize = self.GetClientSize()
+		SpinValue = self.Spin.GetValue()
 
-		if self.PictureSize != wx.Size(0, 0):
+		if self.PictureSize != wx.Size(0, 0) and SpinValue == 0:
 			self.PixelSize = wx.Size(
 				ClientSize.Width // self.PictureSize.Width,
 				(ClientSize.Height-AppFrame.TOP_PADD)//self.PictureSize.Height
 			)
+		else:
+			self.PixelSize = wx.Size(SpinValue, SpinValue)
+
+		self.PlaneSize = wx.Size(
+			ClientSize.Width, 
+			ClientSize.Height-AppFrame.TOP_PADD
+		)
 
 
-	def Draw(self):
-		
+	def Draw(self, memory):
+
 		self.Info.SetLabel("Size: {}x{}\nFrame: {}; Frames: {}".format(
 			self.PictureFile.width,
 			self.PictureFile.height,
@@ -90,21 +119,40 @@ class AppFrame(wx.Frame):
 			self.PictureFile.frames
 		))
 
-		for IndexY in range(self.PictureSize.Height):
-			for IndexX in range(self.PictureSize.Width):
+		memory.SetBackground(self.Brush)
+		memory.Clear()
 
-				x = IndexX*self.PixelSize.Width
-				y = IndexY*self.PixelSize.Height+AppFrame.TOP_PADD
+		Index = 0
+		for Pixels in self.Pixels:
+			
+			ix = Index // self.PictureSize.Width
+			iy = Index % self.PictureSize.Width
 
-				position = wx.Point(x, y)
-				i = IndexY*self.PictureSize.Width + IndexX
+			x = ix*self.PixelSize.Width
+			y = iy*self.PixelSize.Height
 
-				self.PaintZone.SetBrush(wx.Brush(wx.Colour(*self.Pixels[i])))
-				self.PaintZone.SetPen(wx.Pen("white", 0))
-				self.PaintZone.DrawRectangle(position, self.PixelSize)
+			position = wx.Point(x, y)
+
+			memory.SetBrush(wx.Brush(wx.Colour(*Pixels)))
+			memory.SetPen(wx.Pen("white", 0))
+			memory.DrawRectangle(position, self.PixelSize)
+
+			Index += 1
+	
+
+	def UpdateDraw(self):
+
+		Memory = wx.MemoryDC()
+		Memory.SelectObject(self._BUFFER)
+		self.Pixels = self.PictureFile.iter_current_frame()
+		self.Draw(Memory)
+		del Memory
+		self.Refresh(eraseBackground=False)
+		self.Update()
 
 
 	def OnClickPlay(self, evt):
+
 		self.Animated = not self.Animated
 		self.PlayButton.SetLabel("Pause" if self.Animated else "Play")
 
@@ -119,17 +167,33 @@ class AppFrame(wx.Frame):
 			self.PictureFile.open()
 			self.PictureFile.read_meta()
 
+			self.PictureSize = wx.Size(self.PictureFile.get_size())
+			self.RecalculatePixelSize()
+
 			spath = path[path.rfind("/"):]
 			
 			self.SetTitle("Visualizer: "+spath)
-			self.UpdateMetaInfo()
+			self.Pixels = self.PictureFile.iter_current_frame()
+			self.UpdateDraw()
 
 
-	def UpdateMetaInfo(self):
-			
-			self.PictureSize = wx.Size(self.PictureFile.get_size())
-			self.Pixels = self.PictureFile.read_next_frame()
-			self.Draw()
+	def OnClickClear(self, evt):
+
+		self.PictureFile.clear()
+		self.Animated = False
+
+		self.PictureSize = wx.Size(0, 0)
+		self.PixelSize = wx.Size(1, 1)
+
+		self.Pixels = None
+		self._BUFFER = wx.Bitmap(self.PlaneSize)
+		self.UpdateDraw()
+
+
+	def OnScrollSpin(self, evt):
+
+		self.RecalculatePixelSize()
+		self.UpdateDraw()
 
 
 class Executor(wx.App):
@@ -137,7 +201,7 @@ class Executor(wx.App):
 	def OnInit(self):
 
 		#Main event when initialize application
-		self.Frame = AppFrame(None, -1, (0, 0), (300, 300))
+		self.Frame = AppFrame(None, -1, (0, 0), (500, 400))
 		self.Frame.CentreOnScreen()
 		self.Frame.Show()
 

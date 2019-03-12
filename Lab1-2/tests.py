@@ -36,6 +36,7 @@ def test_file_lab1_p2_default():
 	#---------------
 	assert data == defdata
 
+
 def test_file_lab1_p2_iterative():
 
 	file = PictureFile("tests/lab1f2.json")
@@ -73,6 +74,7 @@ def test_file_lab2():
 	
 	assert file.width == file.height == 3
 
+
 def test_files_arr_of_ites_equal_default():
 
 	file = PictureFile("tests/lab2f1.json")
@@ -93,3 +95,19 @@ def test_files_arr_of_ites_equal_default():
 	file.close()
 
 	assert defdata == iterdata
+
+
+def test_check_frames():
+
+	file = PictureFile("tests/lab2f1.json")
+	file.open()
+	file.read_meta()
+
+	x = file.read_current_frame()
+	y = file.read_current_frame()
+	z = file.read_next_frame()
+
+	assert x == y
+	assert x != z
+	assert y != z
+	

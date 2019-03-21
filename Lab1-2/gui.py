@@ -45,6 +45,9 @@ class AppFrame(wx.Frame):
 			"JSON Picture File (*.json)|*.json", wx.FD_OPEN
 		)
 
+		#Timer for button "Start"
+		self.Timer = wx.Timer(self)
+
 		#GUI Properties
 		self.SetMinSize(wx.Size(500, 400))
 		self.Spin.SetRange(0, 100)
@@ -64,6 +67,7 @@ class AppFrame(wx.Frame):
 		#Events
 		self.Bind(wx.EVT_SIZE, self.OnSize)
 		self.Bind(wx.EVT_PAINT, self.OnPaint)
+		self.Bind(wx.EVT_TIMER, self.OnTimerCall, self.Timer)
 		self.Bind(wx.EVT_BUTTON, self.OnClickPlay, self.PlayButton)
 		self.Bind(wx.EVT_BUTTON, self.OnClickOpen, self.OpenButton)
 		self.Bind(wx.EVT_BUTTON, self.OnClickClear, self.ClearButton)
@@ -140,11 +144,16 @@ class AppFrame(wx.Frame):
 			Index += 1
 	
 
-	def UpdateDraw(self):
+	def UpdateDraw(self, fnext=False):
 
 		Memory = wx.MemoryDC()
 		Memory.SelectObject(self._BUFFER)
-		self.Pixels = self.PictureFile.iter_current_frame()
+
+		if fnext:
+			self.Pixels = self.PictureFile.iter_next_frame()
+		else:
+			self.Pixels = self.PictureFile.iter_current_frame()
+
 		self.Draw(Memory)
 		del Memory
 		self.Refresh(eraseBackground=False)
@@ -155,6 +164,11 @@ class AppFrame(wx.Frame):
 
 		self.Animated = not self.Animated
 		self.PlayButton.SetLabel("Pause" if self.Animated else "Play")
+
+		if self.Animated:
+			self.Timer.Start(100)
+		else:
+			self.Timer.Stop()
 
 
 	def OnClickOpen(self, evt):
@@ -173,7 +187,6 @@ class AppFrame(wx.Frame):
 			spath = path[path.rfind("/"):]
 			
 			self.SetTitle("Visualizer: "+spath)
-			self.Pixels = self.PictureFile.iter_current_frame()
 			self.UpdateDraw()
 
 
@@ -194,6 +207,12 @@ class AppFrame(wx.Frame):
 
 		self.RecalculatePixelSize()
 		self.UpdateDraw()
+
+
+	def OnTimerCall(self, evt):
+		self.UpdateDraw(True)
+
+
 
 
 class Executor(wx.App):
